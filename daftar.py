@@ -1,4 +1,4 @@
-import logging
+script_content = """import logging
 import datetime
 import pytz
 import os
@@ -61,7 +61,7 @@ EPOCH_DATE = datetime.date(2026, 3, 23)
 # Helper Functions
 # ----------------------
 def is_allowed(update: Update) -> bool:
-    """Mengecek apakah pesan berasal dari grup dan topik yang diizinkan."""
+    \"\"\"Mengecek apakah pesan berasal dari grup dan topik yang diizinkan.\"\"\"
     if not update.effective_chat or not update.message:
         return False
     return (update.effective_chat.id == TARGET_CHAT_ID and 
@@ -96,7 +96,7 @@ def get_target_datetime(jam_str: str, now: datetime.datetime) -> datetime.dateti
 # ----------------------
 async def send_schedule_to_chat(bot, chat_id, chat_data, waktu, message_id=None, pin_message=False):
     thread_id = chat_data.get("thread_id") or TARGET_THREAD_ID
-    text = f"📋 *Jadwal Shift {waktu.capitalize()}*\n_Otomatis tercentang saat bukti dikirim._"
+    text = f"📋 *Jadwal Shift {waktu.capitalize()}*\\n_Otomatis tercentang saat bukti dikirim._"
     rows = []
     skips = chat_data.get("skips", set())
 
@@ -167,7 +167,7 @@ async def job_persiapan(context: ContextTypes.DEFAULT_TYPE):
         chat_data = context.application.chat_data.get(d["chat_id"]) or {}
         await context.bot.send_message(
             chat_id=d["chat_id"], message_thread_id=d["thread_id"],
-            text=f"🌅 *PERSIAPAN SHIFT {d['shift'].upper()}*\n\nSilakan mulai mengirimkan laporan.", 
+            text=f"🌅 *PERSIAPAN SHIFT {d['shift'].upper()}*\\n\\nSilakan mulai mengirimkan laporan.", 
             parse_mode="Markdown"
         )
         await send_schedule_to_chat(context.bot, d["chat_id"], chat_data, d["shift"], pin_message=True)
@@ -194,7 +194,7 @@ async def job_peringatan(context: ContextTypes.DEFAULT_TYPE):
         try:
             await context.bot.send_message(
                 chat_id=d["chat_id"], message_thread_id=d["thread_id"],
-                text=f"⚠️ *PERINGATAN!* 10 Menit menuju batas akhir laporan *{d['jam']}*.\nBelum lapor: {', '.join(missing)}", 
+                text=f"⚠️ *PERINGATAN!* 10 Menit menuju batas akhir laporan *{d['jam']}*.\\nBelum lapor: {', '.join(missing)}", 
                 parse_mode="Markdown"
             )
         except Exception:
@@ -213,13 +213,13 @@ async def job_rekap(context: ContextTypes.DEFAULT_TYPE):
                 
     admin_tags = "@cartenz88 @Agha1104 @Gemini_Squad"
     if terlewat:
-        msg = (f"📊 <b>RINGKASAN AKHIR SHIFT {d['shift'].upper()}</b>\n\n"
-               f"Terdapat jadwal laporan yang <b>TERLEWAT</b>:\n"
-               f"{chr(10).join(terlewat)}\n\n"
+        msg = (f"📊 <b>RINGKASAN AKHIR SHIFT {d['shift'].upper()}</b>\\n\\n"
+               f"Terdapat jadwal laporan yang <b>TERLEWAT</b>:\\n"
+               f"{chr(10).join(terlewat)}\\n\\n"
                f"Halo {admin_tags}, mohon bantuannya untuk menindaklanjuti. 🙏")
     else:
-        msg = (f"📊 <b>RINGKASAN AKHIR SHIFT {d['shift'].upper()}</b>\n\n"
-               f"Laporan hari ini <b>SEMPURNA!</b> 🎉 Seluruh jadwal telah dilaporkan.\n\n"
+        msg = (f"📊 <b>RINGKASAN AKHIR SHIFT {d['shift'].upper()}</b>\\n\\n"
+               f"Laporan hari ini <b>SEMPURNA!</b> 🎉 Seluruh jadwal telah dilaporkan.\\n\\n"
                f"Halo {admin_tags}, operasional berjalan lancar tanpa kendala. 🙏")
                
     try:
@@ -292,7 +292,7 @@ async def say_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
-    await update.message.reply_text("👋 Bot Jadwal Siap beroperasi di topik ini! Gunakan /aktifkan untuk memulai.")
+    await update.message.reply_text("👋 Bot Jadwal Siap beroperasi di topik ini! Gunakan /aktifkan untuk memulai manual.")
 
 async def aktifkan_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
@@ -306,9 +306,8 @@ async def aktifkan_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     schedule_group_jobs(context.job_queue, cid, thread_id)
     
     current_shift, _ = get_shift_info(datetime.datetime.now(timezone))
-    await update.message.reply_text(f"✅ Sistem DIAKTIFKAN.\nShift: *{current_shift.upper()}*", parse_mode="Markdown")
-    if "schedule_msg_id" not in context.chat_data:
-        await send_schedule_to_chat(context.bot, cid, context.chat_data, current_shift, pin_message=True)
+    await update.message.reply_text(f"✅ Sistem DIAKTIFKAN.\\nShift: *{current_shift.upper()}*", parse_mode="Markdown")
+    # Papan jadwal dinonaktifkan agar tidak muncul saat dipanggil
 
 async def nonaktifkan_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
@@ -330,7 +329,7 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     now = datetime.datetime.now(timezone)
     current_shift, _ = get_shift_info(now)
     is_active = "Aktif ✅" if cid in context.bot_data.get("active_groups", set()) else "Nonaktif ❌"
-    await update.message.reply_text(f"📡 *STATUS BOT*\nStatus: {is_active}\nShift: *{current_shift.upper()}*", parse_mode="Markdown")
+    await update.message.reply_text(f"📡 *STATUS BOT*\\nStatus: {is_active}\\nShift: *{current_shift.upper()}*", parse_mode="Markdown")
 
 async def jadwal_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
@@ -348,7 +347,7 @@ async def rekap_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     current_shift, _ = get_shift_info(datetime.datetime.now(timezone))
     skips = context.chat_data.get("skips", set())
     terlewat = [f"❌ {sec} - {j}" for sec in SUBMENUS for j in TIMES[current_shift] if f"{sec}_{j}" not in skips]
-    msg = f"📊 *REKAP {current_shift.upper()}*\n" + (chr(10).join(terlewat) if terlewat else "Laporan SEMPURNA! 🎉")
+    msg = f"📊 *REKAP {current_shift.upper()}*\\n" + (chr(10).join(terlewat) if terlewat else "Laporan SEMPURNA! 🎉")
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 # ----------------------
@@ -357,7 +356,6 @@ async def rekap_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     
-    # Keamanan tambahan: Pastikan tombol hanya bisa ditekan di grup target (meskipun callback query tidak memiliki thread_id di Telegram saat ini)
     if query.message.chat.id != TARGET_CHAT_ID:
         await query.answer("Aksi tidak diizinkan di grup ini.", show_alert=True)
         return
@@ -382,7 +380,6 @@ async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_schedule_to_chat(context.bot, query.message.chat.id, chat_data, current_shift, message_id=query.message.message_id)
 
 async def auto_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # Menggunakan is_allowed sebagai ganti pengecekan manual sebelumnya
     if not is_allowed(update): return
 
     msg = update.message
@@ -427,7 +424,18 @@ async def auto_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # Main
 # ----------------------
 async def on_startup(app: Application):
-    active = app.bot_data.get("active_groups", set())
+    active = app.bot_data.setdefault("active_groups", set())
+    
+    # Otomatis mendaftarkan TARGET_CHAT_ID ke dalam grup yang aktif
+    if TARGET_CHAT_ID not in active:
+        active.add(TARGET_CHAT_ID)
+        app.bot_data["active_groups"] = active
+        
+    # Pastikan thread_id untuk target juga tersimpan
+    chat_data = app.chat_data.setdefault(TARGET_CHAT_ID, {})
+    if "thread_id" not in chat_data:
+        chat_data["thread_id"] = TARGET_THREAD_ID
+
     for cid in active:
         tid = app.chat_data.get(cid, {}).get("thread_id") or TARGET_THREAD_ID
         schedule_group_jobs(app.job_queue, cid, tid)
@@ -468,3 +476,9 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+"""
+
+with open("daftar-v2.py", "w") as f:
+    f.write(script_content)
+
+print("File generated successfully: daftar-v2.py")
