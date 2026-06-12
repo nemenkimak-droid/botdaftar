@@ -5,12 +5,11 @@ import os
 import asyncio
 import re
 from aiohttp import web
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import (
     Application,
     ApplicationBuilder,
     CommandHandler,
-    CallbackQueryHandler,
     MessageHandler,
     filters,
     ContextTypes,
@@ -36,13 +35,11 @@ timezone = pytz.timezone(os.environ.get("TZ", "Asia/Jakarta"))
 # ----------------------
 # Schedule & Constants
 # ----------------------
-# TARGET ID SPESIFIK DARI LINK TELEGRAM
 TARGET_CHAT_ID = -1003785049591
 TARGET_THREAD_ID = 2
 
 SUBMENUS = ["DWT", "BG", "DWL", "NG", "TG88", "TTGL", "KTT", "TTGG"]
-PAGE_SIZE = 10
-OWNER_USERNAME = "Intan_Payungggg" # Tanpa @ untuk pengecekan string
+OWNER_USERNAME = "Intan_Payungggg"
 
 TIMES = {
     "pagi":  ["08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00"],
@@ -61,7 +58,6 @@ EPOCH_DATE = datetime.date(2026, 3, 23)
 # Helper Functions
 # ----------------------
 def is_allowed(update: Update) -> bool:
-    """Mengecek apakah pesan berasal dari grup dan topik yang diizinkan."""
     if not update.effective_chat or not update.message:
         return False
     return (update.effective_chat.id == TARGET_CHAT_ID and 
@@ -92,59 +88,38 @@ def get_target_datetime(jam_str: str, now: datetime.datetime) -> datetime.dateti
     return target
 
 # ----------------------
-# Tampilan Jadwal
+# Tampilan Jadwal Teks Rapi
 # ----------------------
-async def send_schedule_to_chat(bot, chat_id, chat_data, waktu, message_id=None, pin_message=False):
+async def send_schedule_to_chat(bot, chat_id, chat_data, waktu):
     thread_id = chat_data.get("thread_id") or TARGET_THREAD_ID
-    text = f"📋 *Jadwal Shift {waktu.capitalize()}*\n_Otomatis tercentang saat bukti dikirim._"
-    rows = []
     skips = chat_data.get("skips", set())
-
+    
+    lines = [f"📋 *Jadwal Shift {waktu.capitalize()}*"]
+    
     for sec in SUBMENUS:
-        first = TIMES[waktu][0]
-        sym = "✅" if f"{sec}_{first}" in skips else "❌"
-        rows.append([InlineKeyboardButton(f"{sec} {first} {sym}", callback_data=f"toggle_{sec}_{first}")])
+        lines.append(f"\n🔹 *{sec}*")
+        jadwal = TIMES[waktu]
+        row1, row2 = [], []
         
-        small = []
-        for jam in TIMES[waktu][1:]:
-            s2 = "✅" if f"{sec}_{jam}" in skips else "❌"
-            small.append(InlineKeyboardButton(f"{jam} {s2}", callback_data=f"toggle_{sec}_{jam}"))
-        
-        for i in range(0, len(small), 3):
-            rows.append(small[i:i+3])
+        # Membagi jadwal menjadi 2 baris agar kotak dan simetris
+        for i, j in enumerate(jadwal):
+            sym = "✅" if f"{sec}_{j}" in skips else "❌"
+            item = f"{j} {sym}"
+            if i < 4:
+                row1.append(item)
+            else:
+                row2.append(item)
+                
+        lines.append(" | ".join(row1))
+        if row2:
+            lines.append(" | ".join(row2))
 
-    if message_id:
-        try:
-            await bot.edit_message_text(
-                chat_id=chat_id, message_id=message_id, 
-                text=text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows)
-            )
-            return
-        except Exception as e:
-            if "not modified" not in str(e).lower():
-                pass
+    text = "\n".join(lines)
 
     try:
-        msg = await bot.send_message(
-            chat_id=chat_id, message_thread_id=thread_id, text=text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows)
+        await bot.send_message(
+            chat_id=chat_id, message_thread_id=thread_id, text=text, parse_mode="Markdown"
         )
-        chat_data["schedule_msg_id"] = msg.message_id
-        
-        # --- LOGIKA UNPIN LAMA & PIN BARU ---
-        if pin_message:
-            last_pinned = chat_data.get("last_pinned_id")
-            if last_pinned:
-                try:
-                    await bot.unpin_chat_message(chat_id=chat_id, message_id=last_pinned)
-                except Exception as e:
-                    logger.error(f"Gagal unpin pesan lama: {e}")
-
-            try:
-                await bot.pin_chat_message(chat_id=chat_id, message_id=msg.message_id, disable_notification=True)
-                chat_data["last_pinned_id"] = msg.message_id
-            except Exception as e:
-                logger.error(f"Gagal pin pesan baru: {e}")
-                
     except Exception as e:
         logger.error(f"Gagal kirim pesan jadwal: {e}")
 
@@ -158,19 +133,16 @@ async def job_reset(context: ContextTypes.DEFAULT_TYPE):
     if chat_data is not None:
         chat_data["skips"] = set()
         chat_data["history"] = []
-        chat_data.pop("schedule_msg_id", None) 
     logger.info(f"🔄 Auto-Reset shift {shift} grup {cid}.")
 
 async def job_persiapan(context: ContextTypes.DEFAULT_TYPE):
     d = context.job.data
     try:
-        chat_data = context.application.chat_data.get(d["chat_id"]) or {}
         await context.bot.send_message(
             chat_id=d["chat_id"], message_thread_id=d["thread_id"],
-            text=f"🌅 *PERSIAPAN SHIFT {d['shift'].upper()}*\n\nSilakan mulai mengirimkan laporan.", 
+            text=f"🌅 *PERSIAPAN SHIFT {d['shift'].upper()}*\n\nSilakan mulai mengirimkan laporan. Ketik /jadwal untuk melihat status rekap.", 
             parse_mode="Markdown"
         )
-        await send_schedule_to_chat(context.bot, d["chat_id"], chat_data, d["shift"], pin_message=True)
     except Exception as e:
         logger.error(f"Error persiapan: {e}")
 
@@ -292,7 +264,7 @@ async def say_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
-    await update.message.reply_text("👋 Bot Jadwal Siap beroperasi di topik ini! Sistem berjalan otomatis.")
+    await update.message.reply_text("👋 Bot Jadwal Siap beroperasi dengan Mode Ringan (Teks Biasa)!")
 
 async def aktifkan_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
@@ -307,7 +279,6 @@ async def aktifkan_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     current_shift, _ = get_shift_info(datetime.datetime.now(timezone))
     await update.message.reply_text(f"✅ Sistem DIAKTIFKAN.\nShift: *{current_shift.upper()}*", parse_mode="Markdown")
-    # Papan Jadwal saat /aktifkan sudah dinonaktifkan di sini
 
 async def nonaktifkan_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
@@ -332,6 +303,7 @@ async def status_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"📡 *STATUS BOT*\nStatus: {is_active}\nShift: *{current_shift.upper()}*", parse_mode="Markdown")
 
 async def jadwal_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Fungsi dipanggil khusus hanya jika diketik /jadwal"""
     if not is_allowed(update): return
     
     cid = update.effective_chat.id
@@ -351,33 +323,41 @@ async def rekap_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 # ----------------------
-# Tombol & Auto Check
+# Tombol Manual & Auto Check
 # ----------------------
-async def button(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    
-    if query.message.chat.id != TARGET_CHAT_ID:
-        await query.answer("Aksi tidak diizinkan di grup ini.", show_alert=True)
-        return
-
-    user = query.from_user
+async def manual_toggle_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not is_allowed(update): return
+    user = update.effective_user
     is_owner = user.username and user.username.lower() == OWNER_USERNAME.lower()
     
     if not is_owner:
-        await query.answer("❌ Centang otomatis. Kirim foto bukti!", show_alert=True)
+        await update.message.reply_text("❌ Anda tidak memiliki izin untuk menggunakan perintah ini.")
+        return
+        
+    args = context.args
+    if len(args) != 2:
+        await update.message.reply_text("⚠️ Format salah!\nGunakan: `/centang BRAND JAM` atau `/batal BRAND JAM`\nContoh: `/centang KTT 16:00`", parse_mode="Markdown")
+        return
+        
+    sec, jam = args[0].upper(), args[1]
+    chat_data = context.chat_data
+    skips = chat_data.setdefault("skips", set())
+    key = f"{sec}_{jam}"
+    
+    now = datetime.datetime.now(timezone)
+    current_shift, _ = get_shift_info(now)
+    
+    if sec not in SUBMENUS or jam not in TIMES[current_shift]:
+        await update.message.reply_text(f"❌ Tidak ada jadwal untuk {sec} jam {jam} di shift {current_shift.upper()}.")
         return
 
-    data = query.data
-    if data.startswith("toggle_"):
-        _, sec, jam = data.split("_")
-        chat_data = context.chat_data 
-        skips = chat_data.setdefault("skips", set())
-        key = f"{sec}_{jam}"
-        if key in skips: skips.remove(key)
-        else: skips.add(key)
-        await query.answer("Berhasil diperbarui!")
-        current_shift, _ = get_shift_info(datetime.datetime.now(timezone))
-        await send_schedule_to_chat(context.bot, query.message.chat.id, chat_data, current_shift, message_id=query.message.message_id)
+    cmd = update.message.text.split()[0].lower()
+    if cmd == "/centang":
+        skips.add(key)
+        await update.message.reply_text(f"✅ Jadwal {sec} {jam} berhasil dicentang manual.")
+    elif cmd == "/batal":
+        skips.discard(key)
+        await update.message.reply_text(f"❌ Jadwal {sec} {jam} berhasil dibatalkan.")
 
 async def auto_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update): return
@@ -393,7 +373,6 @@ async def auto_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await msg.reply_text("❌ Wajib lampirkan foto/file!")
             return
 
-        # SyntaxWarning diperbaiki dengan menambahkan r di awal kutipan
         brand_match = re.search(r'BRAND\s*:\s*([A-Z0-9]+)', text)
         waktu_match = re.search(r'WAKTU\s*:\s*(\d{2}:\d{2})', text)
 
@@ -418,8 +397,8 @@ async def auto_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 skips = context.chat_data.setdefault("skips", set())
                 if key not in skips:
                     skips.add(key)
-                    await msg.reply_text(f"✅ {sec} {jam} Diterima!")
-                    await send_schedule_to_chat(context.bot, chat_id, context.chat_data, current_shift, message_id=context.chat_data.get("schedule_msg_id"))
+                    # Hanya menjawab pesan yang masuk tanpa memanggil/memperbarui papan jadwal
+                    await msg.reply_text(f"✅ Laporan {sec} {jam} Diterima!")
 
 # ----------------------
 # Main
@@ -427,7 +406,6 @@ async def auto_check_message(update: Update, context: ContextTypes.DEFAULT_TYPE)
 async def on_startup(app: Application):
     active = app.bot_data.setdefault("active_groups", set())
     
-    # Otomatis mendaftarkan TARGET_CHAT_ID ke dalam grup yang aktif saat menyala
     if TARGET_CHAT_ID not in active:
         active.add(TARGET_CHAT_ID)
         app.bot_data["active_groups"] = active
@@ -457,8 +435,10 @@ async def main():
     app.add_handler(CommandHandler("jadwal", jadwal_cmd))
     app.add_handler(CommandHandler("rekap", rekap_cmd))
     app.add_handler(CommandHandler("say", say_cmd))
+    
+    app.add_handler(CommandHandler("centang", manual_toggle_cmd))
+    app.add_handler(CommandHandler("batal", manual_toggle_cmd))
 
-    app.add_handler(CallbackQueryHandler(button))
     app.add_handler(MessageHandler((filters.TEXT | filters.PHOTO | filters.Document.ALL) & ~filters.COMMAND, auto_check_message))
 
     web_app = web.Application()
