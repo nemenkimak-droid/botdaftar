@@ -37,7 +37,7 @@ timezone = pytz.timezone(os.environ.get("TZ", "Asia/Jakarta"))
 # Schedule & Constants
 # ----------------------
 # TARGET ID SPESIFIK DARI LINK TELEGRAM
-TARGET_CHAT_ID = -1001832259904
+TARGET_CHAT_ID = -1003785049591
 TARGET_THREAD_ID = 3785049591/2
 
 SUBMENUS = ["DWT", "BG", "DWL", "NG", "TG88", "TTGL", "KTT", "TTGG"]
